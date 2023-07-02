@@ -34,4 +34,4 @@ venv
 out/
 
 # Private Data Files
-data_private/
+data/

@@ -19,7 +19,7 @@ from ..base.debug import Debugger
 from ..base.proxy import Proxy
 
 
-__all__ = ("PostfixImap",)
+__all__ = ("ImapClient",)
 
 
 class SocksIMAP4(imaplib.IMAP4):
@@ -231,7 +231,7 @@ class ImapClient:
         except AttributeError:
             return False
 
-    def be_str(self, obj: Union[str, bytes]) -> str:
+    def _to_str(self, obj: Union[str, bytes]) -> str:
         """ensure bytes to be string"""
         if isinstance(obj, bytes):
             return obj.decode(encoding=self.encoding, errors="ignore")
@@ -305,10 +305,10 @@ class ImapClient:
         else:
             e_body = e_body.decode()
 
-        e_date = self.be_str(msg["Date"])
-        e_sub = self.be_str(e_sub)
-        e_from = self.be_str(e_from)
-        e_to = self.be_str(e_to)
+        e_date = self._to_str(msg["Date"])
+        e_sub = self._to_str(e_sub)
+        e_from = self._to_str(e_from)
+        e_to = self._to_str(e_to)
 
         return {
             "uid": uid,
@@ -342,33 +342,6 @@ class ImapClient:
                 res = pattern.findall(msg_data["body"])
                 result.extend(res)
         return list(set(result))
-
-
-class PostfixImap(ImapClient):
-
-    """Postfix Email Imap Client"""
-
-    def __init__(
-        self,
-        host: str,
-        port: int,
-        usr: str,
-        pwd: str,
-        proxy: Optional[Proxy] = None,
-        ssl_enable: bool = True,
-        demo: bool = True,
-        encoding: str = "unicode_escape",
-    ) -> None:
-        super().__init__(
-            host=host,
-            port=port,
-            usr=usr,
-            pwd=pwd,
-            proxy=proxy,
-            ssl_enable=ssl_enable,
-            demo=demo,
-            encoding=encoding,
-        )
 
     @staticmethod
     def _date_str(time_stamp: int = 0, days: int = 1) -> str:

@@ -94,10 +94,12 @@ class RedditHelpers:
                                email_user: str,
                                email_pass: str,
                                proxy_url: str,
-                               timestamp: int = 0) -> list[str]:
+                               time_stamp: int = 0) -> list[str]:
         """Get Reddit verify url from mail.ru inbox."""
-        query = ""
-        pattern = re.compile(r"")
+        pattern = re.compile(r'"(https://www.reddit.com/verification/[\s\S]+?)"')
+        subject = "Verify your Reddit email address"
+        from_email = "noreply@reddit.com"
+        to_email = email_user
 
         proxy = Proxy.load(url=proxy_url)
         client = ImapClient(
@@ -108,7 +110,12 @@ class RedditHelpers:
             ssl_enable=True,
             proxy=proxy,
         )
-        return client.lookup(query=query, pattern=pattern, timestamp=timestamp)
+        return client.search(
+            from_email=from_email,
+            to_email=to_email,
+            subject=subject,
+            pattern=pattern,
+            time_stamp=time_stamp)
 
     def is_alive_user(self, name: str) -> bool:
         """Check if redditor alive."""
@@ -116,3 +123,17 @@ class RedditHelpers:
         about = self.http_get_json(url)
         data = about["data"]
         return not "is_suspended" in data
+
+    def run(self) -> None:
+        """Run."""
+        urls = self.get_verify_url_mail_ru(
+            email_user="ecpraceldue5612@e1.ru",
+            email_pass="SpyMh8w5GC",
+            proxy_url="http://bpusr023:bppwd023@104.206.203.120:12345",
+        )
+        print(urls)
+        # Sad: imap disabled...
+
+
+if __name__ == "__main__":
+    RedditHelpers().run()

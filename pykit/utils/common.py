@@ -10,6 +10,16 @@
 """
 
 
+class Logger:
+    """Logger."""
+
+
+class Storage:
+    """Storage."""
+
+
 
 class Utils:
     """Global Utils."""
+
+
