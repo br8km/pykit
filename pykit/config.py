@@ -21,4 +21,3 @@ class Config:
     dir_debug = dir_out / "debug"
     dir_log = dir_out / "log"
     dir_tmp = dir_out / "tmp"
-
