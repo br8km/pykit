@@ -7,7 +7,7 @@ from time import sleep
 from random import choice, uniform
 
 import regex as re
-from requests import Session
+from requests import Session, RequestException
 
 from ..base.io import IO
 from ..base.imap import ImapClient
@@ -45,58 +45,62 @@ class RedditHelpers:
 
     def new_browser(self) -> Session:
         """Generate New Random requests.Session as Browser."""
-        ua = choice(self.list_ua)
-        px = choice(self.list_px)
-        br = Session()
-        br.headers.update({"User-Agent": ua})
-        br.proxies = {
-            "http": px,
-            "https": px
+        user_agent = choice(self.list_ua)
+        proxy = choice(self.list_px)
+        browser = Session()
+        browser.headers.update({"User-Agent": user_agent})
+        browser.proxies = {
+            "http": proxy,
+            "https": proxy,
         }
-        return br
+        return browser
 
     @staticmethod
-    def delay(a: float, b: float) -> float:
+    def delay(min_seconds: float, max_seconds: float) -> float:
         """Delay for random seconds in (a, b)."""
-        num = uniform(a, b)
+        num = uniform(min_seconds, max_seconds)
         sleep(num)
         return num
 
     def http_get_json(self, url: str, retry: int = 3) -> dict:
         """Http GET Method to get json response."""
-        br = self.new_browser()
+        browser = self.new_browser()
         for _ in range(retry):
             try:
-                with br.get(url=url, timeout=self.timeout) as res:
+                with browser.get(url=url, timeout=self.timeout) as res:
                     if res:
                         return res.json()
-            except Exception as e:
+            except RequestException as err:
                 if self.debug:
-                    raise Exception(e)
+                    raise err
             self.delay(1, 3)
         return {}
-                
+
     def http_get_html(self, url: str, retry: int = 3) -> str:
         """Http GET Method to get html response."""
-        br = self.new_browser()
+        browser = self.new_browser()
         for _ in range(retry):
             try:
-                with br.get(url=url, timeout=self.timeout) as res:
+                with browser.get(url=url, timeout=self.timeout) as res:
                     if res:
                         return res.text
-            except Exception as e:
+            except RequestException as err:
                 if self.debug:
-                    raise Exception(e)
+                    raise err
             self.delay(1, 3)
         return ""
 
-    def get_verify_url_mail_ru(self, email_user: str, email_pass: str, proxy_url: str, timestamp: int = 0) -> list[str]:
+    def get_verify_url_mail_ru(self,
+                               email_user: str,
+                               email_pass: str,
+                               proxy_url: str,
+                               timestamp: int = 0) -> list[str]:
         """Get Reddit verify url from mail.ru inbox."""
         query = ""
         pattern = re.compile(r"")
 
         proxy = Proxy.load(url=proxy_url)
-        im = ImapClient(
+        client = ImapClient(
             host="imap.yandex.com",
             port=993,
             usr=email_user,
@@ -104,7 +108,7 @@ class RedditHelpers:
             ssl_enable=True,
             proxy=proxy,
         )
-        return im.lookup(query=query, pattern=pattern, timestamp=timestamp)
+        return client.lookup(query=query, pattern=pattern, timestamp=timestamp)
 
     def is_alive_user(self, name: str) -> bool:
         """Check if redditor alive."""
