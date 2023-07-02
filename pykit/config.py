@@ -25,17 +25,19 @@ class Config:
     def __init__(self) -> None:
         """Init Config."""
 
-    @getattr
-    def dir_dat(self) -> Path:
+    @property
+    def dir_data(self) -> Path:
         """Get dir_dat Path."""
         if self.private:
             return  self.dir_app / "data_private"
         return self.dir_app / "data"
 
-    def file_ua(self) -> Path:
+    @property
+    def file_user_agent(self) -> Path:
         """File User-Agent."""
-        return self.dir_dat / "ua.txt"
+        return self.dir_data / "ua.txt"
 
-    def file_proxy(self) -> Path:
+    @property
+    def file_proxy_url(self) -> Path:
         """File Proxy Urls."""
-        return self.dir_dat / "proxy.txt"
+        return self.dir_data / "proxy.txt"
