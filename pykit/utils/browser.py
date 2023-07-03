@@ -13,11 +13,11 @@ from ..base.debug import Debugger
 from ..base.http import Http
 
 from ..config import Config
-from ..utils.common import Utils
+from .common import Utils
 
 
 class Browser:
-    """Browser with auto generate HTTP client."""
+    """HTTP Client Browser."""
 
     config = Config()
     utils = Utils()
