@@ -2,3 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """GeoIP Checker."""
+
+
+class GeoIPChecker:
+    """Geo IP Address Checker."""
