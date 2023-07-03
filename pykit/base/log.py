@@ -1,6 +1,7 @@
-"""
-    Init Logger cls
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Logger."""
 
 from datetime import datetime, timezone, timedelta
 from logging import (

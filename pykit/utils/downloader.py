@@ -1,8 +1,7 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-    cls for File/Image Downloading.
-"""
+"""File/Media Downloading."""
 
 import os
 from pathlib import Path

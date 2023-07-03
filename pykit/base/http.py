@@ -27,7 +27,7 @@ class Http:
     __slots__ = (
         "user_agent",
         "proxy_url",
-        "time_out",
+        "timeout",
         "logger",
         "debugger",
         "session",
@@ -39,14 +39,14 @@ class Http:
         user_agent: str,
         proxy_url: str,
         logger: Logger,
-        time_out: int = 30,
+        timeout: int = 30,
         debugger: Optional[Debugger] = None,
     ) -> None:
         """Init Http Client."""
 
         self.user_agent = user_agent
         self.proxy_url = proxy_url
-        self.time_out = time_out
+        self.timeout = timeout
         self.logger = logger
         self.debugger = debugger
 
@@ -206,7 +206,7 @@ class Http:
             self.prepare_headers(**kwargs)
             self.save_req(method, url, debug, **kwargs)
             if not kwargs.get("timeout", None):
-                kwargs["timeout"] = self.time_out
+                kwargs["timeout"] = self.timeout
             with self.session.request(method, url, **kwargs) as response:
                 code = response.status_code
                 length = len(response.text)
