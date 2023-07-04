@@ -4,44 +4,21 @@
 """Demo Script."""
 
 
+from pathlib import Path
+
+
+
 class AnotherDemo:
     """Another Demo."""
 
-    sex: bool = True
 
-    name: str = "Hello"
-    age : int = 30
-
-    @property
-    def gender(self) -> str:
-        """Get Gender."""
-        return "Male" if self.sex else "Female"
-
-    def print_gender(self) -> str:
-        """Print Gender."""
-        print(self.gender)
-        return self.gender
-
-
-
-class TestAnotherDemo:
-    """Test Another Demo."""
-
-    app = AnotherDemo()
-
-    def run_test(self) -> None:
-        """Run Test."""
-        raise NotImplementedError
 
     def run(self) -> None:
         """Run."""
-        print(self.app.gender)
-        self.app.print_gender()
-
-        self.app.sex = False
-        print(self.app.gender)
-        self.app.print_gender()
+        dir_app = Path(__file__).parent
+        file_no = dir_app / "error.txt"
+        content = open(file_no, "r").read()
 
 
 if __name__ == "__main__":
-    TestAnotherDemo().run()
+    AnotherDemo().run()

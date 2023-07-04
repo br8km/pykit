@@ -78,6 +78,6 @@ class Debugger:
                 file.write(json.dumps(data, indent=2))
             else:
                 file.write(data)
-        result = file_name.is_file()
-        self.log(f"[{result}]save debug: {file_name}")
-        return result
+        ok = file_name.is_file()
+        self.log(f"[{ok}]save debug: {file_name}")
+        return ok

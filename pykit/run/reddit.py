@@ -6,7 +6,7 @@
 
 import regex as re
 
-from ..base.imap import ImapClient
+from ..client.imap import ImapClient
 from ..base.proxy import Proxy
 
 from ..config import Config
