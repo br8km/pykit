@@ -1,6 +1,7 @@
-"""
-    Input/Output Operation For File System
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Input/Output Operation For File System."""
 
 import random
 from pathlib import Path

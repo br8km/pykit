@@ -1,6 +1,7 @@
-"""
-    General Data Structures
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""General Data Schema/Sturcture."""
 
 from dataclasses import dataclass
 from enum import IntEnum, unique

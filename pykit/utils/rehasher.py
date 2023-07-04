@@ -1,4 +1,7 @@
-"""Image operation."""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Image/Media File Rehasher."""
 
 import random
 import hashlib

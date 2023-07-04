@@ -9,11 +9,11 @@ from typing import Union
 import orjson
 
 __all__ = (
-    "print2",
+    "print2",  # pprint.pprint ?
     "split_list_int",
     "split_list_str",
-    "to_dict",
-    "to_json",
+    "to_dict",  # dataclasses.asdict
+    "to_json",  # decite.from_dict
 )
 
 

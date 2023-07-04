@@ -1,6 +1,7 @@
-"""
-    Proxy cls for http/socks proxy
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Proxy cls for http/socks proxy."""
 
 from __future__ import annotations
 from base64 import encodebytes
