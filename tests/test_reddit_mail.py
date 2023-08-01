@@ -3,7 +3,7 @@
 
 """Test Reddit."""
 
-from ..run.reddit import RedditHelpers
+from ..pykit.run.reddit import RedditHelpers
 
 
 class TestReddit:

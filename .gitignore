@@ -31,7 +31,11 @@ venv
 .coverage
 
 # Out files
+out/cache/
+out/debug/
+out/log/
+out/tmp/
 out/
 
 # Private Data Files
-data_private/
+data/private/

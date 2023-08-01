@@ -10,7 +10,7 @@ from pathlib import Path
 class Config:
     """Global Config."""
 
-    private = True
+    private = True  # Set Private to protect files upload to github
 
     timezone = "America/New_York"
 
@@ -22,15 +22,11 @@ class Config:
     dir_log = dir_out / "log"
     dir_tmp = dir_out / "tmp"
 
-    def __init__(self) -> None:
-        """Init Config."""
-
     @property
     def dir_data(self) -> Path:
         """Get dir_dat Path."""
-        if self.private:
-            return  self.dir_app / "data_private"
-        return self.dir_app / "data"
+        dir_data = self.dir_app / "data"
+        return dir_data / "private" if self.private else dir_data
 
     @property
     def file_user_agent(self) -> Path:
