@@ -3,7 +3,8 @@
 
 """General Data Schema/Sturcture."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from dacite import from_dict
 from enum import IntEnum, unique
 
 from datetime import datetime
