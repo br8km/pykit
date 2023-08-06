@@ -1,84 +1,88 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""File Caches & Memory Caches."""
- 
+"""File Caches & Memory Caches.
 
-# TODO: Add long presistence file handler for file caches to save cpu usage.
+Features:
+- File Cache
+- Memory Cache
+- Bulk Operation
+- Thread safe
+- Iterable prefer?
 
-# Cache cls optimize
-# - In-Memory option
-# - Bulk operation option
-# - Thread safe
-# - Cache statistics, resource usage, etc.
+"""
 
-from time import time
+from time import time, sleep
 from pathlib import Path
-from threading import RLock
-from typing import KeysView, ValuesView, ItemsView
+from threading import RLock, Thread
+from typing import KeysView, ValuesView, ItemsView, Optional
 
 from ..base.io import IO
+from ..config import Config
+
+
+__all__ = ("FileCache", "MemoryCache", )
 
 
 GLOBAL_LOCK = RLock()  # for threqd safe
 
 
 class AbsCache:
-    """Abstract Cache."""
+    """Cache."""
 
-    # key string for cache time to live: `cache_ttl`.
-    key_ttl = "cache_ttl"
+    key_cache = "cache_time"
 
     @staticmethod
-    def timer() -> int:
+    def now() -> int:
         """Get utcnow timestamp."""
         return int(time())
 
     @classmethod
-    def _expired(cls, seconds: int = 0) -> int:
+    def ts_expire(cls, seconds: int) -> int:
         """Get expected timestamp to be expired."""
         assert seconds >= 0
-        return cls.timer() - seconds
+        return cls.now - seconds
 
     @classmethod
-    def _ttl(cls, seconds: int = 0) -> int:
-        """Get timestamp to live along with."""
-        assert seconds >= 0
-        return cls.timer() + seconds
+    def is_expired(cls, item: dict, seconds: int) -> bool:
+        """Check if item expired or not."""
+        expired = cls.ts_expire(seconds=seconds)
+        return item[cls.key_cache] <= expired
 
 
 class FileCache(AbsCache):
-    """File Cache.
+    """File Cache. 
 
-        Notes:
-            - cost resource very high, using for NOT very frequent cases.
+    Notes:
+        - If need frequent Operation, Please Use Memory Cache.
     
     """
 
     # --- cache for Any data
+
     @classmethod
-    def has_cache(cls, file: Path, seconds: int) -> bool:
+    def has_file(cls, file: Path, seconds: int) -> bool:
         """Has cached file for seconds or Not."""
         with GLOBAL_LOCK:
-            expired = cls._expired(seconds=seconds)
+            expired = cls.ts_expire(seconds=seconds)
             return bool(
                 file.is_file()
                 and file.stat().st_mtime > expired
             )
 
     @classmethod
-    def prune_cache(cls, file: Path, seconds: int = 0) -> None:
+    def prune_file(cls, file: Path, seconds: int) -> None:
         """Prune cache file expired out of seconds."""
         with GLOBAL_LOCK:
-            expired = cls._expired(seconds=seconds)
+            expired = cls.ts_expire(seconds=seconds)
             if file.is_file() and file.stat().st_mtime <= expired:
                 file.unlink()
 
     @classmethod
-    def prune_caches(cls, dir: Path, seconds: int = 0) -> None:
+    def prune_dir(cls, dir: Path, seconds: int) -> None:
         """Prune cache files from dir which expired out of seconds."""
         with GLOBAL_LOCK:
-            expired = cls._expired(seconds=seconds)
+            expired = cls.ts_expire(seconds=seconds)
             for fp in dir.iterdir():
                 if fp.is_file() and fp.stat().st_mtime <= expired:
                     fp.unlink()
@@ -88,35 +92,36 @@ class FileCache(AbsCache):
     @classmethod
     def prune_list_dict(cls, data: list[dict], seconds: int) -> list[dict]:
         """Prune list of dict."""
-        expired = cls._expired(seconds=seconds)
-        return [item for item in data if item[cls.key_ttl] >= expired]
+        expired = cls.ts_expire(seconds=seconds)
+        return [item for item in data if item[cls.key_cache] > expired]
 
     @classmethod
     def load_list_dict(cls, file: Path, seconds: int) -> list[dict]:
         """Load list of user dict from local cache."""
         with GLOBAL_LOCK:
+            result: list[dict] = []
             if file.is_file():
                 data = IO.load_list_dict(file)
                 return cls.prune_list_dict(data=data, seconds=seconds)
-            return []
+            return result
 
     @classmethod
     def add_list_dict(cls, file: Path, item: dict, seconds: int) -> bool:
         """Add one item into local cache."""
         with GLOBAL_LOCK:
             cached = cls.load_list_dict(file=file, seconds=seconds)
-            item[cls.key_ttl] = cls._ttl(seconds=seconds)
+            item[cls.key_cache] = cls.now()
             cached.append(item)
             IO.save_list_dict(file_name=file, file_data=cached)
             return file.is_file()
 
     @classmethod
-    def save_list_dict(cls, file: Path, data: list[dict], seconds: int) -> bool:
+    def add_list_dict_many(cls, file: Path, data: list[dict], seconds: int) -> bool:
         """Save list of items into local cache."""
         with GLOBAL_LOCK:
             cached = cls.load_list_dict(file=file, seconds=seconds)
             for item in data:
-                item[cls.key_ttl] = cls._ttl(seconds=seconds)
+                item[cls.key_cache] = cls.now()
                 cached.append(item)
             IO.save_list_dict(file_name=file, file_data=cached)
             return file.is_file()
@@ -126,35 +131,36 @@ class FileCache(AbsCache):
     @classmethod
     def prune_dict_dict(cls, data: dict[str, dict], seconds: int) -> dict[str, dict]:
         """Prune dict of dict."""
-        expired = cls._expired(seconds=seconds)
-        return {key: item for key, item in data if item[cls.key_ttl] >= expired}
+        expired = cls.ts_expire(seconds=seconds)
+        return {key: item for key, item in data if item[cls.key_cache] > expired}
 
     @classmethod
     def load_dict_dict(cls, file: Path, seconds: int) -> dict[str, dict]:
         """Load dict of dict from local cache."""
         with GLOBAL_LOCK:
+            result: dict[str, dict] = {}
             if file.is_file():
                 data = IO.load_dict(file)
                 return cls.prune_dict_dict(data=data, seconds=seconds)
-            return {}
+            return result
 
     @classmethod
-    def add_dict_dict(cls, file: Path, key: str, item: dict, seconds: int) -> bool:
+    def add_dict_dict(cls, file: Path, key: str, value: dict, seconds: int) -> bool:
         """Add one key:item into local cache."""
         with GLOBAL_LOCK:
             cached = cls.load_dict_dict(file=file, seconds=seconds)
-            item[cls.key_ttl] = cls._ttl(seconds=seconds)
-            cached[key] = item
+            value[cls.key_cache] = cls.now()
+            cached[key] = value
             IO.save_dict(file_name=file, file_data=cached)
             return file.is_file()
 
     @classmethod
-    def save_dict_dict(cls, file: Path, data: dict[str, dict], seconds: int) -> bool:
+    def add_dict_dict_many(cls, file: Path, data: dict[str, dict], seconds: int) -> bool:
         """Add one key:item into local cache."""
         with GLOBAL_LOCK:
             cached = cls.load_dict_dict(file=file, seconds=seconds)
             for key, item in data.items():
-                item[cls.key_ttl] = cls._ttl(seconds=seconds)
+                item[cls.key_cache] = cls.now()
                 cached[key] = item
             IO.save_dict(file_name=file, file_data=cached)
             return file.is_file()
@@ -163,31 +169,98 @@ class FileCache(AbsCache):
 class MemoryCache(AbsCache):
     """Memory Cache."""
 
-    _cache: dict[str, dict]  # cached data: {key[str]: value[dict]}
-    _lock: RLock
+    _file: Path
     _seconds: int
+    _lock: RLock
+    _cache: dict[str, dict]
 
-    def __init__(self, seconds: int = 86400 * 7) -> None:
+    def __init__(self, 
+                 file: Path,
+                 seconds: int = 86400 * 7,
+                 lock: Optional[RLock] = None) -> None:
+
         """Init."""
-        self._cache = {}
-        self._lock = RLock()
+        self._file = file
         self._seconds = seconds
+        self._lock = lock if lock else RLock()
+        self._cache = {}
 
-    def load(self, file: Path) -> bool:
+        self.load(file=file)
+
+    def load(self) -> bool:
         """Load cache data from File."""
         with self._lock:
-            if file.is_file():
-                self._cache = IO.load_dict(file)
+            if self._file.is_file():
+                self._cache = IO.load_dict(self._file)
                 self.prune()
             return bool(self._cache)
                 
-    def save(self, file: Path) -> bool:
+    def save(self) -> bool:
         """Save cache data into File."""
         with self._lock:
             self.prune()
             if self._cache:
-                IO.save_dict(file_data=file, file_data=self._cache)
-            return file.is_file()
+                IO.save_dict(file_data=self._file, file_data=self._cache)
+                return self._file.is_file()
+            else:
+                self._file.unlink(missing_ok=True)
+                return not self._file.is_file()
+
+    def prune(self) -> int:
+        """Prune any expired items from cache.
+
+        Returns:
+            number of pruned items which expired as of now.
+        
+        """
+        count = 0
+        for key, value in self.items():
+            if self.is_expired(item=value, seconds=self._seconds):
+                count += self.delete(key)
+        return count
+
+    def exit(self) -> None:
+        """Exit."""
+        self.prune()
+        self.save(file=self._file)
+
+    def set(self, key: str, value: dict) -> None:
+        """Set key:value for cache."""
+        value[self.key_cache] = self.now()
+        self._cache[key] = value
+
+    def set_many(self, items: dict[str, dict]) -> None:
+        """Set many key:value for cache."""
+        for key, value in items.items():
+            self.set(key=key, value=value)
+
+    def add(self, key: str, value: dict, force: bool = False) -> None:
+        """Add key:value into cache, set force to update if exist."""
+        if self.has(key) and not force:
+            return
+        self.set(key=key, value=value)
+
+    def add_many(self, items: dict[str, dict], force: bool = False) -> None:
+        """Add many key:value into cache, set force to update if exist."""
+        for key, value in items.items():
+            self.add(key=key, value=value, force=force)
+
+    def delete(self, key: str) -> int:
+        """Delete item for cache by key string."""
+        count = 0
+        try:
+            del self._cache[key]
+            count += 1
+        except KeyError:
+            pass
+        return count
+
+    def delete_many(self, keys: list[str]) -> int:
+        """Delete many items from cache by keys."""
+        count = 0
+        for key in keys:
+            count += self.delete(key)
+        return count
 
     def __len__(self) -> int:
         with self._lock:
@@ -208,7 +281,7 @@ class MemoryCache(AbsCache):
         Note:
             Cache is copied from the underlying cache storage before returning.
         """
-        return self.copy().keys()
+        return self._cache.keys()
 
     def values(self) -> ValuesView:
         """
@@ -217,7 +290,7 @@ class MemoryCache(AbsCache):
         Note:
             Cache is copied from the underlying cache storage before returning.
         """
-        return self.copy().values()
+        return self._cache.values()
 
     def items(self) -> ItemsView:
         """
@@ -227,7 +300,7 @@ class MemoryCache(AbsCache):
             Returned data is copied from the cache object, but any modifications to mutable values
             will modify this cache object's data.
         """
-        return self.copy().items()
+        return self._cache.items()
 
     def clear(self) -> None:
         """Clear all cache entries."""
@@ -237,11 +310,12 @@ class MemoryCache(AbsCache):
     def has(self, key: str) -> bool:
         """Return whether cache key exists and hasn't expired."""
         with self._lock:
-            return key in self.keys()
+            value = self.get(key=key)
+            return bool(value)
 
     def size(self) -> int:
         """Return number of cache entries."""
-        return len(self)
+        return len(self._cache)
 
     def get(self, key: str) -> dict:
         """
@@ -255,223 +329,226 @@ class MemoryCache(AbsCache):
             The cached value.
         """
         with self._lock:
-            return self._get(key)
+            try:
+                value = self._cache.get(key, {})
+                if value:
+                    if self.is_expired(item=value, seconds=self._seconds):
+                        self.delete(key)
+                        raise KeyError
+            except KeyError:
+                value = {}
+            return value
 
-    def _get(self, key: str) -> dict:
-        try:
-            value = self._cache[key]
-            if self.expired(key):
-                self._delete(key)
-                raise KeyError
-        except KeyError:
-            value = {}
-        return value
 
-    def add(self, key: str, value: dict, seconds: int = 0) -> None:
-        """
-        Add cache key/value if it doesn't already exist.
+class TestCache:
+    """Test Cache."""
 
-        This method ignores keys that exist which leaves the original seconds in tact.
+    config = Config()
 
-        Args:
-            key: Cache key to add.
-            value: Cache value.
-            seconds: TTL value. Defaults to ``0``
-                by :attr:`timer`.
-        """
-        with self._lock:
-            self._add(key, value, seconds=seconds)
+    dir_cache = config.dir_debug / "testcache"
+    dir_cache.mkdir(parents=True, exist_ok=True)
+    file_cache = dir_cache / "cache.json"
 
-    def _add(self, key: str, value: dict, seconds: int = 0) -> None:
-        if self._has(key):
-            return
-        self._set(key, value, seconds=seconds)
+    def test_abscache(self, seconds: int = 5) -> None:
+        """Test AbsCache."""
+        app = AbsCache()
 
-    def add_many(self, items: dict[str, dict], seconds: int = 0) -> None:
-        """
-        Add multiple cache keys at once.
+        assert app.now <= int(time())
 
-        Args:
-            items: Mapping of cache key/values to set.
-            seconds: TTL value. Defaults to ``None`` which uses :attr:`ttl`. Time units are determined
-                by :attr:`timer`.
-        """
-        for key, value in items.items():
-            self.add(key, value, seconds=seconds)
+        item: dict[str, int] = {
+            "name": "item_name",
+            app.key_cache: app.ts_expire(seconds=seconds)
+        }
+        assert not app.is_expired(item=item, seconds=seconds)
+        sleep(secs=seconds + 1)
+        assert app.is_expired(item=item, seconds=seconds)
 
-    def set(self, key: str, value: dict, seconds: int = 0) -> None:
-        """
-        Set cache key/value and replace any previously set cache key.
+    def test_filecache(self, seconds: int = 5) -> None:
+        """Test FileCache."""
+        app = FileCache()
 
-        If the cache key previously existed, setting it will move it to the end of the cache stack
-        which means it would be evicted last.
+        # test filecache for any data
+        assert not app.has_file(file=self.file_cache, seconds=seconds)
 
-        Args:
-            key: Cache key to set.
-            value: Cache value.
-            seconds: TTL value. Defaults to ``None`` which uses :attr:`ttl`. Time units are determined
-                by :attr:`timer`.
-        """
-        with self._lock:
-            self._set(key, value, seconds=seconds)
+        # save file for string content
+        IO.save_str(file_name=self.file_cache, file_content="hello")
+        assert app.has_file(file=self.file_cache, seconds=seconds)
 
-    def _set(self, key: str, value: dict, seconds: int = 0) -> None:
-        if not seconds:
-            seconds = self._ttl
+        # prune file
+        app.prune_file(file=self.file_cache, seconds=seconds)
+        # still exist
+        assert app.has_file(file=self.file_cache, seconds=seconds)
+        # wait for seconds + 1
+        sleep(secs=seconds + 1)
+        # file been pruned
+        assert not app.has_file(file=self.file_cache, seconds=seconds)
 
-        if key not in self._cache:
-            self.prune()
+        # save file for bytes content
+        IO.save_bytes(file_name=self.file_cache, file_content=b"hello")
+        assert app.has_file(file=self.file_cache, seconds=seconds)
+        sleep(secs=seconds + 1)
+        # wait for seconds + 1 and prune dir
+        app.prune_dir(dir=self.dir_cache)
+        # dir|file been pruned
+        assert not app.has_file(file=self.file_cache, seconds=seconds)
 
-        self._delete(key)
-        self._cache[key] = value
+        # cache operate for list of dict items
+        items_ld: list[dict] = [{"age": age} for age in range(5)]
 
-        if seconds > 0:
-            self._expire[key] = self.timer() + seconds
+        # start with no cache
+        self.file_cache.unlink(missing_ok=True)
+        result_ld = app.load_list_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_ld) == 0
 
-    def set_many(self, items: dict[str, dict], seconds: int = 0) -> None:
-        """
-        Set multiple cache keys at once.
+        # add one item into cache
+        app.add_list_dict(
+            file=self.file_cache,
+            item=items_ld[0],
+            seconds=seconds,
+        )
+        result_ld = app.load_list_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_ld) == 1
 
-        Args:
-            items: Mapping of cache key/values to set.
-            seconds: TTL value. Defaults to ``None`` which uses :attr:`ttl`. Time units are determined
-                by :attr:`timer`.
-        """
-        with self._lock:
-            self._set_many(items, seconds=seconds)
+        # add remain items into cache
+        app.add_list_dict_many(
+            file=self.file_cache,
+            data=items_ld[1:],
+            seconds=seconds,
+        )
+        # wait half of seconds defined before
+        sleep(seconds / 2)
+        result_ld = app.load_list_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_ld) == len(items_ld)
 
-    def _set_many(self, items: dict[str, dict], seconds: int = 0) -> None:
-        for key, value in items.items():
-            self._set(key, value, seconds=seconds)
+        # wait another half of seconds defined before plus 1
+        sleep(seconds / 2 + 1)
+        result_ld = app.load_list_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_ld) == 0
 
-    def delete(self, key: str) -> int:
-        """
-        Delete cache key and return number of entries deleted (``1`` or ``0``).
+        # cache operate for dict of dict items
+        items_dd: dict[str, dict] = {f"idx_{i}": {"idx": i} for i in range(5)}
 
-        Args:
-            key: Cache key to delete.
+        # start with no cache
+        self.file_cache.unlink(missing_ok=True)
+        result_dd = app.load_dict_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_dd) == 0
 
-        Returns:
-            int: ``1`` if key was deleted, ``0`` if key didn't exist.
-        """
-        with self._lock:
-            return self._delete(key)
+        # add one key:value into cache
+        key_0 = items_dd.keys()[0]
+        value_0 = items_dd[key_0]
+        app.add_dict_dict(
+            file=self.file_cache,
+            key=key_0,
+            value=value_0,
+            seconds=seconds,
+        )
+        result_dd = app.load_dict_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_dd) == 1
 
-    def _delete(self, key: str) -> int:
-        count = 0
+        # add remain items into cache
+        key_0 = items_dd.keys()[0]
+        remain = {k:v for k, v in items_dd if k!=key_0}
+        app.add_list_dict_many(
+            file=self.file_cache,
+            data=remain,
+            seconds=seconds,
+        )
+        # wait half of seconds defined before
+        sleep(seconds / 2)
+        result_dd = app.load_dict_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_dd) == len(items_dd)
 
-        try:
-            del self._cache[key]
-            count = 1
-        except KeyError:
-            pass
+        # wait another half of seconds defined before plus 1
+        sleep(seconds / 2 + 1)
+        result_dd = app.load_dict_dict(file=self.file_cache, seconds=seconds)
+        assert len(result_dd) == 0
 
-        try:
-            del self._expire[key]
-        except KeyError:
-            pass
+        # clean up cache file|dir
+        self.file_cache.unlink(missing_ok=True)
+        self.dir_cache.rmdir()
 
-        return count
+    def _test_memorycache(self) -> None:
+        """Test MemoryCache."""
+        raise NotImplementedError
 
-    def delete_many(self, keys: list[str]) -> int:
-        """
-        Delete multiple cache keys at once filtered by an `keys`.
+    def test_memorycache(self, lock: RLock, seconds: int = 5) -> None:
+        """Test MemoryCache."""
+        items_dd: dict[str, dict] = {f"idx_{i}": {"idx": i} for i in range(5)}
 
-        Args:
-            keys: list of key string.
+        # start with no cached item
+        app = MemoryCache(file=self.file_cache, seconds=seconds, lock=lock)
+        assert app.size() == 0
 
-        Returns:
-            int: Number of cache keys deleted.
-        """
-        with self._lock:
-            return self._delete_many(keys)
+        # add one key:value into cache
+        key_0 = items_dd.keys()[0]
+        value_0 = items_dd[key_0]
+        app.add(
+            key=key_0,
+            value=value_0,
+            force=False,
+        )
+        assert app.size() == 1
 
-    def _delete_many(self, keys: list[str]) -> int:
-        count = 0
-        with self._lock:
-            keys = self._filter_keys(keys)
-            for key in keys:
-                count += self._delete(key)
-        return count
+        # add remain items into cache
+        key_0 = items_dd.keys()[0]
+        remain = {k:v for k, v in items_dd if k!=key_0}
+        app.add_many(
+            items=remain,
+            force=False,
+        )
+        # wait half of seconds defined before
+        sleep(seconds / 2)
+        assert app.size() == len(items_dd)
 
-    def delete_expired(self) -> int:
-        """
-        Delete expired cache keys and return number of entries deleted.
+        # wait another half of seconds defined before plus 1
+        sleep(seconds / 2 + 1)
+        assert app.size() == 0
 
-        Returns:
-            int: Number of entries deleted.
-        """
-        with self._lock:
-            return self._delete_expired()
+        # add all items again
+        app.add_many(items=items_dd)
+        assert app.size() == len(items_dd)
 
-    def _delete_expired(self) -> int:
-        if not self._expire:
-            return 0
+        # delete first key:value
+        key_0 = items_dd.keys()[0]
+        app.delete(key=key_0)
+        assert app.size() == len(items_dd) - 1
 
-        # Use a static expiration time for each key for better consistency as opposed to
-        # a newly computed timestamp on each iteration.
-        count = 0
-        expires_on = self.timer()
-        expire_times = self._expire.copy()
+        # delete another two key:value
+        keys_2 = items_dd.keys()[1:2]
+        app.delete_many(keys=keys_2)
+        assert app.size() == len(items_dd) - 3
 
-        for key, expiration in expire_times.items():
-            if expiration <= expires_on:
-                count += self._delete(key)
-        return count
+        # save remain items into file
+        assert app.save()
 
-    def expired(self, key: str, expires_on: int = 0) -> bool:
-        """
-        Return whether cache key is expired or not.
+        # clear all items
+        app.clear()
+        assert app.size() == 0
+        assert app.save()
 
-        Args:
-            key: Cache key.
-            expires_on: Timestamp of when the key is considered expired. Defaults to ``None`` which
-                uses the current value returned from :meth:`timer`.
-        """
-        if not expires_on:
-            expires_on = self.timer()
+        # clean up cache file|dir
+        self.file_cache.unlink(missing_ok=True)
+        self.dir_cache.rmdir()
 
-        try:
-            return self._expire[key] <= expires_on
-        except KeyError:
-            return key not in self._cache
+    def test_memorycache_multi(self, num: int = 2, seconds: int = 5) -> None:
+        """Test MemoryCache in multi-threading."""
+        lock = RLock()
+        threads: list[Thread] = []
+        for _ in range(num):
+            th = Thread(target=self.test_memorycache, args=(lock, seconds,))
+            threads.append(th)
+            th.start()
 
-    def expire_times(self) -> dict[str, int]:
-        """
-        Return cache expirations for seconds keys.
+        for th in threads:
+            th.join()
 
-        Returns:
-            dict
-        """
-        with self._lock:
-            return self._expire.copy()
+        for th in threads:
+            assert not th.is_alive()
 
-    def get_seconds(self, key: str) -> int:
-        """
-        Return the remaining time to live of a key that has a seconds.
+    def run_test(self) -> None:
+        """Run Test."""
+        raise NotImplementedError
 
-        Args:
-            key: Cache key.
 
-        Returns:
-            The remaining time to live of `key` or ``0`` if the key doesn't exist or has expired.
-        """
-        with self._lock:
-            if not self._has(key):
-                return 0
-
-            expire_time = self._expire.copy().get(key)
-            if expire_time is None:
-                return 0
-
-            seconds = expire_time - self.timer()
-            return seconds
-
-    def prune(self) -> int:
-        """
-        Perform cache eviction per the cache replacement policy:
-
-        Returns:
-            Number of cache entries evicted.
-        """
-        return self.delete_expired()
+if __name__ == "__main__":
+    TestCache().run_test()
