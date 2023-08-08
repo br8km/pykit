@@ -77,18 +77,6 @@ class ParamValidator:
         )
 
     @classmethod
-    def is_allowed_complex(cls, name: str, value: complex, allowed: list[int]) -> bool:
-        """Check if param value in allowed list of complex."""
-        if allowed and value in allowed:
-            return True
-
-        raise InvalidParamError(
-            method="is_allowed_complex",
-            name=name,
-            value=value,
-        )
-
-    @classmethod
     def is_allowed(cls,
                    name: str,
                    value: Union[str, int, float],
@@ -114,13 +102,6 @@ class ParamValidator:
 
             if isinstance(value, float):
                 return cls.is_allowed_float(
-                    name=name,
-                    value=value,
-                    allowed=allowed,
-                )
-
-            if isinstance(value, complex):
-                return cls.is_allowed_complex(
                     name=name,
                     value=value,
                     allowed=allowed,
@@ -215,9 +196,82 @@ class TestParamValidator:
         print(err2.value)
         print(err2.message)
 
+    def get_error(self) -> None:
+        """Get Error."""
+        raise NotImplementedError
+
+    def test_is_allowed(self) -> None:
+        """Test is allowed."""
+
+        name = "ben"
+        name_allowed = ["ben", "alex"]
+        assert ParamValidator.is_allowed_str(
+                name="name",
+                value=name,
+                allowed=name_allowed,
+        )
+
+        age = 25
+        age_allowed = [24, 25, 26]
+        assert ParamValidator.is_allowed_int(
+                name="age",
+                value=age,
+                allowed=age_allowed,
+        )
+
+        ratio = 0.58
+        ratio_allowed = [0.50, 0.58, 0.60]
+        assert ParamValidator.is_allowed_float(
+                name="ratio",
+                value=ratio,
+                allowed=ratio_allowed,
+        )
+
+
+    def test_is_between(self) -> None:
+        """Test is between."""
+
+        delay = 1
+        assert ParamValidator.is_between(
+            name="delay",
+            value=delay,
+            left=1,
+            right=9,
+            weight="left",
+        )
+
+        delay = 9
+        assert ParamValidator.is_between(
+            name="delay",
+            value=delay,
+            left=1,
+            right=9,
+            weight="right",
+        )
+
+        delay = 5
+        assert ParamValidator.is_between(
+            name="delay",
+            value=delay,
+            left=1,
+            right=9,
+            weight="none",
+        )
+        
+        delay = 5
+        assert ParamValidator.is_between(
+            name="delay",
+            value=delay,
+            left=1,
+            right=9,
+            weight="both",
+        )
+
     def run_test(self) -> None:
         """Run Test."""
         self.test_error_pickable()
+        self.test_is_allowed()
+        self.test_is_between()
 
 
 if __name__ == "__main__":
