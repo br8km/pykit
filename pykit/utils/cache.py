@@ -8,7 +8,11 @@ Features:
 - Memory Cache
 - Bulk Operation
 - Thread safe
+
+TODO:
+- sorting by value.keys?
 - Iterable prefer?
+
 
 """
 
